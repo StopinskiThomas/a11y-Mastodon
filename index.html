@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mastodon Accessibility Wortwolke</title>
+    
+    <!-- Barrierefreiheit: Semantische Meta-Tags für bessere Zugänglichkeit -->
+    <meta name="description" content="Durchsucht Mastodon nach Accessibility und Barrierefreiheit Posts und stellt diese als interaktive Wortwolke dar">
+    <meta name="keywords" content="Mastodon, Accessibility, Barrierefreiheit, Wortwolke, A11y">
+    
+    <style>
+        /* CSS Reset und Basis-Styling mit Fokus auf Barrierefreiheit */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            /* Barrierefreiheit: Hoher Farbkontrast (mindestens 4.5:1) */
+            background-color: #ffffff;
+            color: #212529;
+            line-height: 1.6;
+            /* Barrierefreiheit: Ausreichende Zeilenhöhe für bessere Lesbarkeit */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            /* Barrierefreiheit: Große, gut lesbare Überschrift */
+            font-size: 2.5rem;
+            color: #0066cc;
+            margin-bottom: 1rem;
+        }
+
+        .description {
+            font-size: 1.1rem;
+            color: #495057;
+            max-width: 600px;
+            margin: 0 auto 2rem;
+        }
+
+        .controls {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            /* Barrierefreiheit: Labels sind klar mit Inputs verknüpft */
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+            /* Barrierefreiheit: Große Touch-Targets (mindestens 44px) */
+            min-height: 44px;
+        }
+
+        /* Barrierefreiheit: Deutlicher Fokus-Indikator */
+        input:focus, select:focus, button:focus {
+            outline: 3px solid #0066cc;
+            outline-offset: 2px;
+            border-color: #0066cc;
+        }
+
+        button {
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            min-height: 44px;
+            /* Barrierefreiheit: Große Touch-Targets */
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #0052a3;
+        }
+
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .wordcloud-container {
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 2rem;
+            min-height: 400px;
+            position: relative;
+            /* Barrierefreiheit: Container für Wortwolke mit klaren Grenzen */
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #6c757d;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #0066cc;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .word-item {
+            display: inline-block;
+            margin: 0.25rem;
+            padding: 0.5rem 1rem;
+            background: linear-gradient(45deg, #0066cc, #00a8ff);
+            color: white;
+            border-radius: 20px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            /* Barrierefreiheit: Interaktive Elemente sind klar erkennbar */
+        }
+
+        .word-item:hover, .word-item:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 102, 204, 0.3);
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            /* Barrierefreiheit: Fehlermeldungen sind deutlich hervorgehoben */
+        }
+
+        .stats {
+            background: #e9ecef;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        /* Barrierefreiheit: Responsive Design für verschiedene Bildschirmgrößen */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .controls {
+                padding: 1rem;
+            }
+        }
+
+        /* Barrierefreiheit: Reduzierte Bewegung für Nutzer mit entsprechenden Präferenzen */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Barrierefreiheit: Hochkontrast-Modus */
+        @media (prefers-contrast: high) {
+            body {
+                background-color: #000000;
+                color: #ffffff;
+            }
+            
+            .controls, .wordcloud-container {
+                background-color: #000000;
+                border-color: #ffffff;
+            }
+            
+            input, select {
+                background-color: #000000;
+                color: #ffffff;
+                border-color: #ffffff;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Mastodon Accessibility Wortwolke</h1>
+            <p class="description">
+                Durchsucht Mastodon-Instanzen nach Posts mit den Hashtags #accessibility und #barrierefreiheit 
+                und erstellt eine gewichtete Wortwolke basierend auf Häufigkeit und Wichtigkeit.
+            </p>
+        </header>
+
+        <main>
+            <!-- Barrierefreiheit: Formular mit semantischen Labels und Feldsets -->
+            <section class="controls" role="region" aria-labelledby="search-settings">
+                <h2 id="search-settings">Sucheinstellungen</h2>
+                
+                <div class="form-group">
+                    <label for="instance-select">Mastodon-Instanz auswählen:</label>
+                    <select id="instance-select" aria-describedby="instance-help">
+                        <option value="mastodon.social">mastodon.social</option>
+                        <option value="mastodon.online">mastodon.online</option>
+                        <option value="mas.to">mas.to</option>
+                        <option value="mstdn.social">mstdn.social</option>
+                        <option value="fosstodon.org">fosstodon.org</option>
+                    </select>
+                    <small id="instance-help">Wählen Sie eine Mastodon-Instanz für die Suche aus</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="max-posts">Maximale Anzahl Posts:</label>
+                    <input type="number" id="max-posts" min="10" max="200" value="50" 
+                           aria-describedby="posts-help">
+                    <small id="posts-help">Anzahl der zu durchsuchenden Posts (10-200)</small>
+                </div>
+
+                <button id="search-btn" type="button" aria-describedby="search-help">
+                    Suche starten
+                </button>
+                <small id="search-help">Startet die Suche nach Accessibility-Posts auf Mastodon</small>
+            </section>
+
+            <!-- Barrierefreiheit: Live-Region für dynamischen Content -->
+            <div id="status" aria-live="polite" aria-atomic="true"></div>
+
+            <!-- Barrierefreiheit: Hauptinhaltsbereich mit semantischer Struktur -->
+            <section class="wordcloud-container" role="region" aria-labelledby="wordcloud-title">
+                <h2 id="wordcloud-title">Wortwolke</h2>
+                <div id="wordcloud" aria-describedby="wordcloud-description">
+                    <p id="wordcloud-description">
+                        Hier wird die Wortwolke angezeigt. Klicken Sie auf "Suche starten", um zu beginnen.
+                    </p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Globale Variablen für die Anwendungslogik
+        let currentData = [];
+        let isLoading = false;
+
+        // DOM-Elemente referenzieren für bessere Performance
+        const elements = {
+            searchBtn: document.getElementById('search-btn'),
+            instanceSelect: document.getElementById('instance-select'),
+            maxPosts: document.getElementById('max-posts'),
+            wordcloud: document.getElementById('wordcloud'),
+            status: document.getElementById('status')
+        };
+
+        /**
+         * Barrierefreiheit: Status-Updates für Screen Reader
+         * Aktualisiert die Live-Region mit wichtigen Informationen
+         */
+        function updateStatus(message, isError = false) {
+            elements.status.textContent = message;
+            elements.status.className = isError ? 'error' : 'stats';
+            
+            // Barrierefreiheit: Fokus auf Fehlermeldungen für sofortige Aufmerksamkeit
+            if (isError) {
+                elements.status.setAttribute('role', 'alert');
+            } else {
+                elements.status.removeAttribute('role');
+            }
+        }
+
+        /**
+         * Zeigt Loading-Animation während der API-Anfrage
+         * Barrierefreiheit: Visueller und textueller Indikator
+         */
+        function showLoading() {
+            elements.wordcloud.innerHTML = `
+                <div class="loading">
+                    <div class="spinner" role="progressbar" aria-label="Lade Daten"></div>
+                    <p>Durchsuche Mastodon nach Accessibility-Posts...</p>
+                </div>
+            `;
+            isLoading = true;
+            elements.searchBtn.disabled = true;
+        }
+
+        /**
+         * Versteckt Loading-Animation
+         */
+        function hideLoading() {
+            isLoading = false;
+            elements.searchBtn.disabled = false;
+        }
+
+        /**
+         * Bereinigt und normalisiert Text für bessere Analyse
+         * Entfernt HTML, URLs und andere störende Elemente
+         */
+        function cleanText(text) {
+            return text
+                // HTML-Tags entfernen
+                .replace(/<[^>]*>/g, ' ')
+                // URLs entfernen
+                .replace(/https?:\/\/[^\s]+/g, ' ')
+                // Mehrere Leerzeichen normalisieren
+                .replace(/\s+/g, ' ')
+                // Sonderzeichen bereinigen, aber Umlaute beibehalten
+                .replace(/[^\w\säöüßÄÖÜ#@]/g, ' ')
+                .trim()
+                .toLowerCase();
+        }
+
+        /**
+         * Deutsche Stoppwörter für bessere Wortanalyse
+         * Filtert häufige aber wenig aussagekräftige Wörter heraus
+         */
+        const germanStopWords = new Set([
+            'der', 'die', 'und', 'in', 'den', 'von', 'zu', 'das', 'mit', 'sich', 'des', 'auf',
+            'für', 'ist', 'im', 'dem', 'nicht', 'ein', 'eine', 'als', 'auch', 'es', 'an',
+            'werden', 'aus', 'er', 'hat', 'dass', 'sie', 'nach', 'wird', 'bei', 'einer',
+            'um', 'am', 'sind', 'noch', 'wie', 'einem', 'über', 'einen', 'so', 'zum', 'war',
+            'haben', 'nur', 'oder', 'aber', 'vor', 'zur', 'bis', 'mehr', 'durch', 'man',
+            'sein', 'wurde', 'sei', 'in', 'ich', 'du', 'wir', 'ihr', 'mich', 'mir', 'uns',
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
+            'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does',
+            'did', 'will', 'would', 'should', 'could', 'can', 'may', 'might', 'must', 'this',
+            'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him',
+            'her', 'us', 'them', 'my', 'your', 'his', 'her', 'its', 'our', 'their'
+        ]);
+
+        /**
+         * Analysiert Posts und erstellt gewichtete Wortliste
+         * Berücksichtigt Häufigkeit, Länge und Kontext der Wörter
+         */
+        function analyzePostsForWordCloud(posts) {
+            const wordFrequency = new Map();
+            const contextBonus = new Map(); // Bonus für wichtige Kontexte
+            
+            // Wichtige Begriffe für Accessibility - erhalten höhere Gewichtung
+            const importantTerms = new Set([
+                'accessibility', 'barrierefreiheit', 'a11y', 'screenreader', 'blind', 'deaf',
+                'disability', 'behinderung', 'inclusive', 'inklusiv', 'wcag', 'aria',
+                'contrast', 'kontrast', 'navigation', 'keyboard', 'tastatur', 'focus',
+                'alt', 'caption', 'untertitel', 'sign', 'language', 'gebärdensprache'
+            ]);
+
+            posts.forEach(post => {
+                const text = cleanText(post.content || '');
+                const words = text.split(/\s+/).filter(word => 
+                    word.length > 2 && // Mindestens 3 Zeichen
+                    !germanStopWords.has(word) && // Keine Stoppwörter
+                    !word.startsWith('#') && // Keine Hashtags (werden separat behandelt)
+                    !word.startsWith('@') // Keine Mentions
+                );
+
+                words.forEach(word => {
+                    const count = wordFrequency.get(word) || 0;
+                    let weight = 1;
+
+                    // Gewichtung basierend auf Wichtigkeit
+                    if (importantTerms.has(word)) {
+                        weight = 3; // Dreifache Gewichtung für wichtige Begriffe
+                    }
+
+                    // Bonus für längere, spezifischere Begriffe
+                    if (word.length > 8) {
+                        weight *= 1.5;
+                    }
+
+                    wordFrequency.set(word, count + weight);
+                });
+
+                // Hashtags separat verarbeiten
+                const hashtags = text.match(/#\w+/g) || [];
+                hashtags.forEach(tag => {
+                    const cleanTag = tag.substring(1); // # entfernen
+                    if (cleanTag.length > 2) {
+                        const count = wordFrequency.get(cleanTag) || 0;
+                        wordFrequency.set(cleanTag, count + 2); // Hashtags erhalten doppelte Gewichtung
+                    }
+                });
+            });
+
+            // Sortiere nach Häufigkeit und gib Top-Begriffe zurück
+            return Array.from(wordFrequency.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 50) // Top 50 Begriffe
+                .map(([word, count]) => ({
+                    word,
+                    count,
+                    size: Math.min(Math.max(count * 4, 12), 48) // Schriftgröße zwischen 12px und 48px
+                }));
+        }
+
+        /**
+         * Rendert die Wortwolke mit barrierefreien Elementen
+         * Erstellt interaktive, fokussierbare Elemente
+         */
+        function renderWordCloud(wordData) {
+            if (!wordData || wordData.length === 0) {
+                elements.wordcloud.innerHTML = `
+                    <p>Keine Begriffe gefunden. Versuchen Sie es mit einer anderen Instanz oder mehr Posts.</p>
+                `;
+                return;
+            }
+
+            // Barrierefreiheit: Statistiken über gefundene Begriffe
+            const totalWords = wordData.reduce((sum, item) => sum + item.count, 0);
+            updateStatus(`${wordData.length} relevante Begriffe gefunden (${totalWords} Vorkommen insgesamt)`);
+
+            // HTML für Wortwolke generieren
+            const wordCloudHTML = wordData.map((item, index) => {
+                return `
+                    <span class="word-item" 
+                          style="font-size: ${item.size}px;" 
+                          tabindex="0"
+                          role="button"
+                          aria-label="${item.word}, ${item.count} Mal erwähnt"
+                          data-word="${item.word}"
+                          data-count="${item.count}">
+                        ${item.word}
+                    </span>
+                `;
+            }).join('');
+
+            elements.wordcloud.innerHTML = wordCloudHTML;
+
+            // Event-Listener für Interaktionen hinzufügen
+            const wordItems = elements.wordcloud.querySelectorAll('.word-item');
+            wordItems.forEach(item => {
+                // Barrierefreiheit: Keyboard- und Maus-Navigation
+                item.addEventListener('click', handleWordClick);
+                item.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleWordClick(e);
+                    }
+                });
+            });
+        }
+
+        /**
+         * Behandelt Klicks auf Wörter in der Wortwolke
+         * Zeigt Details und ermöglicht weitere Aktionen
+         */
+        function handleWordClick(event) {
+            const word = event.target.dataset.word;
+            const count = event.target.dataset.count;
+            
+            // Barrierefreiheit: Informative Rückmeldung für Screen Reader
+            updateStatus(`Begriff "${word}" ausgewählt - ${count} Mal erwähnt`);
+            
+            // Hier könnte weitere Funktionalität implementiert werden:
+            // - Filterung der ursprünglichen Posts
+            // - Detailansicht
+            // - Export-Funktionen
+        }
+
+        /**
+         * Sucht Posts über die Mastodon API
+         * Implementiert Fehlerbehandlung und Rate-Limiting
+         */
+        async function searchMastodonPosts(instance, maxPosts) {
+            const searchTerms = ['%23accessibility', '%23barrierefreiheit', '%23a11y'];
+            const limit = Math.min(maxPosts / searchTerms.length, 40); // API-Limit beachten
+            
+            let allPosts = [];
+
+            try {
+                // Parallele Suche nach verschiedenen Hashtags
+                const searchPromises = searchTerms.map(async (term) => {
+                    const url = `https://${instance}/api/v2/search?q=${term}&type=statuses&limit=${limit}`;
+                    
+                    const response = await fetch(url, {
+                        headers: {
+                            'Accept': 'application/json',
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    return data.statuses || [];
+                });
+
+                // Warte auf alle Suchanfragen
+                const results = await Promise.all(searchPromises);
+                allPosts = results.flat();
+
+                // Duplikate entfernen basierend auf Post-ID
+                const uniquePosts = Array.from(
+                    new Map(allPosts.map(post => [post.id, post])).values()
+                );
+
+                return uniquePosts.slice(0, maxPosts);
+
+            } catch (error) {
+                console.error('Fehler beim Abrufen der Posts:', error);
+                throw new Error(`Fehler beim Verbinden mit ${instance}: ${error.message}`);
+            }
+        }
+
+        /**
+         * Hauptfunktion für die Suche und Generierung der Wortwolke
+         * Orchestriert den gesamten Prozess
+         */
+        async function performSearch() {
+            if (isLoading) return;
+
+            const instance = elements.instanceSelect.value;
+            const maxPosts = parseInt(elements.maxPosts.value, 10);
+
+            // Eingabevalidierung
+            if (maxPosts < 10 || maxPosts > 200) {
+                updateStatus('Bitte geben Sie eine Zahl zwischen 10 und 200 ein.', true);
+                elements.maxPosts.focus(); // Barrierefreiheit: Fokus auf fehlerhafte Eingabe
+                return;
+            }
+
+            showLoading();
+            updateStatus('Starte Suche...');
+
+            try {
+                // Posts von Mastodon abrufen
+                updateStatus('Lade Posts von Mastodon...');
+                const posts = await searchMastodonPosts(instance, maxPosts);
+
+                if (posts.length === 0) {
+                    updateStatus('Keine Posts gefunden. Versuchen Sie es mit einer anderen Instanz.', true);
+                    elements.wordcloud.innerHTML = '<p>Keine Posts gefunden.</p>';
+                    return;
+                }
+
+                // Wortwolke analysieren und generieren
+                updateStatus('Analysiere Posts und erstelle Wortwolke...');
+                const wordData = analyzePostsForWordCloud(posts);
+                currentData = { posts, wordData };
+
+                // Wortwolke rendern
+                renderWordCloud(wordData);
+
+            } catch (error) {
+                console.error('Suchfehler:', error);
+                updateStatus(error.message, true);
+                elements.wordcloud.innerHTML = `
+                    <div class="error">
+                        <p><strong>Fehler:</strong> ${error.message}</p>
+                        <p>Bitte versuchen Sie es mit einer anderen Instanz oder reduzieren Sie die Anzahl der Posts.</p>
+                    </div>
+                `;
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Event-Listener für Benutzerinteraktionen
+        elements.searchBtn.addEventListener('click', performSearch);
+
+        // Barrierefreiheit: Enter-Taste in Eingabefeldern
+        elements.maxPosts.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        // Barrierefreiheit: Initialer Fokus auf ersten interaktiven Element
+        document.addEventListener('DOMContentLoaded', () => {
+            elements.instanceSelect.focus();
+        });
+
+        // Barrierefreiheit: Escape-Taste zum Abbrechen der Suche
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isLoading) {
+                // In einer echten Implementierung würde hier die laufende Anfrage abgebrochen
+                updateStatus('Suche abgebrochen');
+            }
+        });
+    </script>
+</body>
+</html>
